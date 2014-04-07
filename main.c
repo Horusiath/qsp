@@ -23,43 +23,6 @@ void add_history(char* unused) {}
 
 #endif
 
-lval* eval_op(lval* x, char* op, lval* y) {
-  
-  /* If either value is an error return it */
-  if (x->type == LVAL_ERR) { return x; }
-  if (y->type == LVAL_ERR) { return y; }
-  
-  /* Otherwise do maths on the number values */
-  if (strcmp(op, "+") == 0) { return lval_num(x->num + y->num); }
-  if (strcmp(op, "-") == 0) { return lval_num(x->num - y->num); }
-  if (strcmp(op, "*") == 0) { return lval_num(x->num * y->num); }
-  if (strcmp(op, "/") == 0) {
-    /* If second operand is zero return error instead of result */
-    return y->num == 0 ? lval_err("Divide by Zero") : lval_num(x->num / y->num);
-  }
-  
-  return lval_err("invalid operation");
-}
-
-lval* eval(mpc_ast_t* t) {
-  
-  if (strstr(t->tag, "number")) {
-    /* Check if there is some error in conversion */
-    long x = strtol(t->contents, NULL, 10);
-    return errno != ERANGE ? lval_num(x) : lval_err("invalid number");
-  }
-  
-  char* op = t->children[1]->contents;  
-  lval* x = eval(t->children[2]);
-  
-  int i = 3;
-  while (strstr(t->children[i]->tag, "expr")) {
-    x = eval_op(x, op, eval(t->children[i]));
-    i++;
-  }
-  
-  return x;  
-}
 
 lval* lval_read_num(mpc_ast_t* t) {
   long x = strtol(t->contents, NULL, 10);
@@ -73,6 +36,7 @@ lval* lval_read(mpc_ast_t* t){
   lval* x = NULL;
   if (strcmp(t->tag, ">") == 0) { x = lval_sexpr(); }
   if (strstr(t->tag, "sexpr")) { x = lval_sexpr(); }
+  if (strstr(t->tag, "qexpr")) { x = lval_qexpr(); }
 
   for (int i = 0; i < t->children_num; ++i)
   {
@@ -92,19 +56,21 @@ int main(int argc, char** argv) {
   
   mpc_parser_t* Number = mpc_new("number");
   mpc_parser_t* Symbol = mpc_new("symbol");
+  mpc_parser_t* Qexpr = mpc_new("qexpr");
   mpc_parser_t* Sexpr = mpc_new("sexpr");
   mpc_parser_t* Expr = mpc_new("expr");
   mpc_parser_t* Qsp = mpc_new("qsp");
   
   mpca_lang(MPC_LANG_DEFAULT,
-    "                                                     \
-      number   : /-?[0-9]+/ ;                             \
-      symbol : '+' | '-' | '*' | '/' ;                  \
-      sexpr    : '(' <expr>* ')' ;                        \
-      expr     : <number> | <symbol> | <sexpr> ;  \
-      qsp    : /^/ <symbol> <expr>+ /$/ ;             \
-    ",
-    Number, Symbol, Sexpr, Expr, Qsp);
+		  "                                                    \
+		    number : /-?[0-9]+/ ;                              \
+		    symbol : \"list\" | \"head\" | \"tail\" | \"eval\" | \"join\" | '+' | '-' | '*' | '/' ;                   \
+		    sexpr  : '(' <expr>* ')' ;                         \
+		    qexpr  : '{' <expr>* '}' ;                         \
+		    expr   : <number> | <symbol> | <sexpr> | <qexpr> ; \
+		    qsp  : /^/ <expr>* /$/ ;                         \
+		  ",
+    Number, Symbol, Sexpr, Qexpr, Expr, Qsp);
   
   puts("Qsp Version 0.0.0.1");
   puts("Press Ctrl+c to Exit\n");
@@ -132,7 +98,7 @@ int main(int argc, char** argv) {
     
   }
   
-  mpc_cleanup(5, Number, Symbol, Sexpr, Expr, Qsp);
+  mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, Qsp);
   
   return 0;
 }
