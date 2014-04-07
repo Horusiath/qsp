@@ -148,6 +148,23 @@ lval* builtin_tail(lval* a) {
 	return h;
 }
 
+lval* builtin_init(lval* a) {
+	// check for errors
+	LASSERT(a, (a->count == 1), "Function 'head' passed too many arguments!")
+
+	lval* h = a->cell[0];
+	LASSERT(a, (h->type == LVAL_QEXPR), "Function 'head' passed incorrect types!")
+	LASSERT(a, (h->count != 0), "Function 'head' passed {}!")
+
+	//take first
+	h = lval_take(a, 0);
+
+	// delete first element and return
+	lval_del(lval_pop(h, h->count - 1));
+
+	return h;
+}
+
 lval* builtin_list(lval* a) {
 	a->type = LVAL_QEXPR;
 	return a;
@@ -186,6 +203,37 @@ lval* builtin_join(lval* a) {
 
 	lval_del(a);
 	return x;
+}
+
+lval* builtin_cons(lval* a) {
+	LASSERT(a, (a->count == 2), "Function 'cons' passed insufficient number of parameters!")
+	lval* h = a->cell[0];
+	LASSERT(a, (h->type == LVAL_NUM), "Function 'cons' passed invalid type")
+	h = a->cell[1];
+	LASSERT(a, (h->type == LVAL_QEXPR), "Function 'cons' passed invalid type")
+
+	lval* x = lval_pop(a, 0);
+	lval* list = lval_qexpr();
+	lval_add(list, x);
+
+	lval* y = lval_join(list, lval_pop(a, 1));
+	lval_del(a);
+	return y;
+}
+
+lval* builtin_len(lval* a) {
+	LASSERT(a, (a->count == 1), "Function 'eval' passed too many parameters!")
+	lval* h = a->cell[0];
+	LASSERT(a, (h->type == LVAL_QEXPR), "Function 'eval' passed incorrect type!")
+
+	h = lval_take(a, 0);
+	int len = h->count;
+	// delete all non-head elements
+	while(h->count > 0) {
+		lval_del(lval_pop(h, 0));
+	}
+
+	return lval_num(len);
 }
 
 lval* builtin_op(lval* a, char* op) {
@@ -235,6 +283,9 @@ lval* builtin(lval* a, char* func) {
 	if (strcmp("head", func) == 0) { return builtin_head(a); }
 	if (strcmp("tail", func) == 0) { return builtin_tail(a); }
 	if (strcmp("join", func) == 0) { return builtin_join(a); }
+	if (strcmp("len", func) == 0) { return builtin_len(a); }
+	if (strcmp("cons", func) == 0) { return builtin_cons(a); }
+	if (strcmp("init", func) == 0) { return builtin_init(a); }
 	if (strcmp("eval", func) == 0) { return builtin_eval(a); }
 	if (strcmp("+-*/", func)) { return builtin_op(a, func); }
 
