@@ -508,13 +508,58 @@ int lval_eq(lval* x, lval* y) {
 	return 0;
 }
 
+lval* builtin_bool(lenv* e, lval* a, char* op) {
+	LASSERT_NUM(op, a, 2);
+	LASSERT_TYPE(op, a, 0, LVAL_NUM);
+	LASSERT_TYPE(op, a, 1, LVAL_NUM);
+
+	if(strcmp(op, "&&") == 0) {
+		lval* x = lval_pop(a, 0);
+		if(x->num != 0){
+			lval* y = lval_pop(a, 0);
+			lval_del(a);
+			lval_del(x);
+			return y;
+		} else {
+			lval_del(a);
+			return x;
+		}
+	}
+	else if(strcmp(op, "||") == 0) {
+		lval* x = lval_pop(a, 0);
+		if(x->num == 0){
+			lval* y = lval_pop(a, 0);
+			lval_del(a);
+			lval_del(x);
+			return y;
+		} else {
+			lval_del(a);
+			return x;
+		}
+	}
+
+	return lval_err("Unsupported logical operator '%s'.", op);
+}
+
+lval* builtin_and(lenv* e, lval* a) { return builtin_bool(e, a, "&&"); }
+lval* builtin_or(lenv* e, lval* a) { return builtin_bool(e, a, "||"); }
+lval* builtin_neq(lenv* e, lval* a) {
+	LASSERT_NUM("!", a, 1);
+	LASSERT_TYPE("!", a, 0, LVAL_NUM);
+
+	int x = a->cell[0]->num == 0 ? 1 : 0;
+	lval_del(a);
+
+	return lval_num(x);
+}
+
 lval* lval_cmp(lenv* e, lval* a, char* op) {
 	LASSERT_NUM(op, a, 2);
 
 	int r;
 
 	if(strcmp(op, "==") == 0) { r = lval_eq(a->cell[0], a->cell[1]); }
-	if(strcmp(op, "!=") == 0) { r = !lval_eq(a->cell[0], a->cell[1]); }
+	else if(strcmp(op, "!=") == 0) { r = !lval_eq(a->cell[0], a->cell[1]); }
 
 	lval_del(a);
 	return lval_num(r);
@@ -675,6 +720,9 @@ void lenv_add_builtins(lenv* e){
 	lenv_add_builtin(e, ">=", builtin_ge);
 	lenv_add_builtin(e, "<", builtin_lt);
 	lenv_add_builtin(e, "<=", builtin_le);
+	lenv_add_builtin(e, "||", builtin_or);
+	lenv_add_builtin(e, "&&", builtin_and);
+	lenv_add_builtin(e, "!", builtin_neq);
 
 	lenv_add_builtin(e, "\\", builtin_lambda);
 	lenv_add_builtin(e, "def", builtin_def);
