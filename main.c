@@ -23,7 +23,6 @@ void add_history(char* unused) {}
 
 #endif
 
-
 lval* lval_read_num(mpc_ast_t* t) {
   long x = strtol(t->contents, NULL, 10);
   return errno != ERANGE ? lval_num(x) : lval_err("invalid number");
@@ -60,21 +59,23 @@ int main(int argc, char** argv) {
   mpc_parser_t* Sexpr = mpc_new("sexpr");
   mpc_parser_t* Expr = mpc_new("expr");
   mpc_parser_t* Qsp = mpc_new("qsp");
-  
+
   mpca_lang(MPC_LANG_DEFAULT,
-		  "                                                    \
-		    number : /-?[0-9]+/ ;                              \
-		    symbol : \"list\" | \"head\" | \"tail\" | \"eval\" | \"join\" | \"len\" | \"init\" | \"cons\" | '+' | '-' | '*' | '/' ;                   \
-		    sexpr  : '(' <expr>* ')' ;                         \
-		    qexpr  : '{' <expr>* '}' ;                         \
-		    expr   : <number> | <symbol> | <sexpr> | <qexpr> ; \
-		    qsp  : /^/ <expr>* /$/ ;                         \
+		  "                                                     \
+		    number : /-?[0-9]+/ ;                               \
+		    symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;         \
+		    sexpr  : '(' <expr>* ')' ;                          \
+		    qexpr  : '{' <expr>* '}' ;                          \
+		    expr   : <number> | <symbol> | <sexpr> | <qexpr> ;  \
+		    qsp  : /^/ <expr>* /$/ ;                          \
 		  ",
     Number, Symbol, Sexpr, Qexpr, Expr, Qsp);
-  
+
   puts("Qsp Version 0.0.0.1");
   puts("Press Ctrl+c to Exit\n");
   
+  lenv* e = lenv_new();
+  lenv_add_builtins(e);
   while (1) {
   
     char* input = readline("qsp> ");
@@ -83,7 +84,7 @@ int main(int argc, char** argv) {
     mpc_result_t r;
     if (mpc_parse("<stdin>", input, Qsp, &r)) {
       
-      lval* x = lval_eval(lval_read(r.output));
+      lval* x = lval_eval(e, lval_read(r.output));
       lval_println(x);
       lval_del(x);
 
@@ -95,8 +96,8 @@ int main(int argc, char** argv) {
     }
     
     free(input);
-    
   }
+  lenv_del(e);
   
   mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, Qsp);
   
