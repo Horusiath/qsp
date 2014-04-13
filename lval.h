@@ -29,16 +29,28 @@ enum {
 struct lval {
   int type;
 
-  long num;
+  /* basic data */
   char* err;
   char* sym;
-  lbuiltin fun;
 
+  /* builtin functions */
+  lbuiltin builtin;
+
+  /* lambda functions */
+  lenv* env;
+  lval* formals;
+  lval* body;
+
+  /* values */
+  long num;
+
+  /* expression */
   int count;
   struct lval** cell;
 };
 
 struct lenv {
+  lenv* par;
   int count;
   char** syms;
   lval** vals;
@@ -46,6 +58,7 @@ struct lenv {
 
 lval* lval_num(long x);
 lval* lval_fun(lbuiltin func);
+lval* lval_lambda(lval* formals, lval* body);
 lval* lval_err(char* fmt, ...);
 lval* lval_sym(char* s);
 lval* lval_sexpr(void);
@@ -66,6 +79,7 @@ lenv* lenv_new(void);
 void lenv_del(lenv* e);
 lval* lenv_get(lenv* e, lval* k);
 void lenv_put(lenv* e, lval* v, lval* k);
+void lenv_def(lenv* e, lval* v, lval* k);
 void lenv_add_builtins(lenv* e);
 
 #endif
