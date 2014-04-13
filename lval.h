@@ -46,7 +46,7 @@ struct lenv {
 
 lval* lval_num(long x);
 lval* lval_fun(lbuiltin func);
-lval* lval_err(char* x);
+lval* lval_err(char* fmt, ...);
 lval* lval_sym(char* s);
 lval* lval_sexpr(void);
 lval* lval_qexpr(void);
