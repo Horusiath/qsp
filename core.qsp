@@ -1,3 +1,9 @@
 def {fun} (\ {args body} {def (head args) (\ (tail args) body)})
+def {true} 1
+def {false} 0
 fun {unpack f xs} {eval (join (list f) xs)}
 fun {pack f & xs} {f xs}
+fun {rev l} {if (== l {}) {{}} {join (rev (tail l)) (head l)}}
+fun {nth n l} {if (== n 0) {head l} {nth (- n 1) (tail l)}}
+fun {in e l} {if (== l {}) {0} {if (== e (head l)) {1} {in e (tail l)}}}
+fun {last l} {if (== 1 (len l)) {head l} {last (tail l)}}

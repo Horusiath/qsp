@@ -320,12 +320,10 @@ lval* builtin_lambda(lenv* e, lval* a) {
 lval* builtin_head(lenv* e, lval* a) {
 	// check error
 	LASSERT_NUM("head", a, 1);
-
-	lval* h = a->cell[0];
 	LASSERT_TYPE("head", a, 0, LVAL_QEXPR);
 	LASSERT_NOT_EMPTY("head", a, 0);
 
-	h = lval_take(a, 0);
+	lval* h = lval_take(a, 0);
 
 	// delete all non-head elements
 	while(h->count > 1) {
