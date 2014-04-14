@@ -1,6 +1,28 @@
 #ifndef LVAL_H
 #define LVAL_H
 
+#define LASSERT(args, cond, fmt, ...) 				\
+	if(!(cond)) { 									\
+		lval* err = lval_err(fmt, ##__VA_ARGS__);	\
+		lval_del(args);								\
+		return err;									\
+	}
+
+#define LASSERT_TYPE(func, args, index, expect)											\
+	LASSERT(args, (args->cell[index]->type == expect), 									\
+		"Function '%s' passed incorrect type for argument %i. Got %s, expected %s.",	\
+		func, index, ltype_name(args->cell[index]->type), ltype_name(expect))
+
+#define LASSERT_NUM(func, args, num)													\
+	LASSERT(args, (args->count == num),													\
+		"Function '%s' passed incorrect number of arguments. Got %i, expected %i.",		\
+		func, args->count, num)
+
+#define LASSERT_NOT_EMPTY(func, args, index) 			\
+	LASSERT(args, (args->cell[index]->count != 0),		\
+		"Function '%s' passed {} for argument %i.",		\
+		func, index)
+
 struct lval;
 struct lenv;
 typedef struct lval lval;
@@ -18,6 +40,7 @@ enum {
 /* Create Enumeration of Possible lval Types */
 enum { 
 	LVAL_NUM, 
+	LVAL_STR,
 	LVAL_FUN,
 	LVAL_ERR,
 	LVAL_SYM,
@@ -32,6 +55,9 @@ struct lval {
   /* basic data */
   char* err;
   char* sym;
+
+  /* strings */
+  char* str;
 
   /* builtin functions */
   lbuiltin builtin;
@@ -57,6 +83,7 @@ struct lenv {
 };
 
 lval* lval_num(long x);
+lval* lval_str(char* s);
 lval* lval_fun(lbuiltin func);
 lval* lval_lambda(lval* formals, lval* body);
 lval* lval_err(char* fmt, ...);
@@ -80,6 +107,7 @@ void lenv_del(lenv* e);
 lval* lenv_get(lenv* e, lval* k);
 void lenv_put(lenv* e, lval* v, lval* k);
 void lenv_def(lenv* e, lval* v, lval* k);
+void lenv_add_builtin(lenv* e, char* name, lbuiltin func);
 void lenv_add_builtins(lenv* e);
 
 #endif

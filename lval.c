@@ -2,34 +2,20 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#define LASSERT(args, cond, fmt, ...) 				\
-	if(!(cond)) { 									\
-		lval* err = lval_err(fmt, ##__VA_ARGS__);	\
-		lval_del(args);								\
-		return err;									\
-	}
-
-#define LASSERT_TYPE(func, args, index, expect)											\
-	LASSERT(args, (args->cell[index]->type == expect), 									\
-		"Function '%s' passed incorrect type for argument %i. Got %s, expected %s.",	\
-		func, index, ltype_name(args->cell[index]->type), ltype_name(expect))
-
-#define LASSERT_NUM(func, args, num)													\
-	LASSERT(args, (args->count == num),													\
-		"Function '%s' passed incorrect number of arguments. Got %i, expected %i.",		\
-		func, args->count, num)
-
-#define LASSERT_NOT_EMPTY(func, args, index) 			\
-	LASSERT(args, (args->cell[index]->count != 0),		\
-		"Function '%s' passed {} for argument %i.",		\
-		func, index)
-
 /* Create a new number type lval */
 lval* lval_num(long x) {
   lval* v = (lval*)malloc(sizeof(lval));
   v->type = LVAL_NUM;
   v->num = x;
   return v;
+}
+
+lval* lval_str(char* s) {
+	  lval* v = (lval*)malloc(sizeof(lval));
+	  v->type = LVAL_STR;
+	  v->str = (char*)malloc(strlen(s) + 1);
+	  strcpy(v->str, s);
+	  return v;
 }
 
 lval* lval_fun(lbuiltin func) {
@@ -92,6 +78,7 @@ char * ltype_name(int t) {
 	case LVAL_QEXPR: return "Q-Expression";
 	case LVAL_SEXPR: return "S-Expression";
 	case LVAL_SYM: return "Symbol";
+	case LVAL_STR: return "String";
 	default: return "Unknown";
 	}
 }
@@ -132,6 +119,7 @@ lval* lval_add(lval* e, lval* x) {
 void lval_del(lval* v){
   switch(v->type){
     case LVAL_NUM: break;
+    case LVAL_STR: free(v->str); break;
     case LVAL_FUN:
     	if(!v->builtin){
     		lenv_del(v->env);
@@ -153,10 +141,21 @@ void lval_del(lval* v){
   free(v);
 }
 
+void lval_print_str(lval* v) {
+	char * escaped = malloc(strlen(v->str) + 1);
+	strcpy(escaped, v->str);
+	escaped = mpcf_escape(escaped);
+
+	printf("\"%s\"", escaped);
+
+	free(escaped);
+}
+
 /* Print an "lval" */
 void lval_print(lval* v) {
   switch (v->type) {
     case LVAL_NUM: printf("%li", v->num); break;
+    case LVAL_STR: lval_print_str(v); break;
     case LVAL_SYM: printf("%s", v->sym); break;
     case LVAL_FUN: if(v->builtin) {
 			printf("<builtin>");
@@ -213,6 +212,10 @@ lval* lval_copy(lval* v) {
 
 	switch(v->type) {
 		case LVAL_NUM: x->num = v->num; break;
+		case LVAL_STR:
+			x->str = (char*)malloc(strlen(v->str)+1);
+			strcpy(x->str, v->str);
+			break;
 		case LVAL_FUN:
 			if(v->builtin){
 				x->builtin = v->builtin;
@@ -485,6 +488,7 @@ int lval_eq(lval* x, lval* y) {
 
 	switch(x->type) {
 		case LVAL_NUM: return (x->num == y->num);
+		case LVAL_STR: return (strcmp(x->str, y->str) == 0);
 		case LVAL_SYM: return (strcmp(x->sym, y->sym) == 0);
 		case LVAL_ERR: return (strcmp(x->err, y->err) == 0);
 		case LVAL_FUN:
@@ -698,6 +702,28 @@ lval* builtin_sub(lenv* e, lval* a) { return builtin_op(e, a, "-"); }
 lval* builtin_mul(lenv* e, lval* a) { return builtin_op(e, a, "*"); }
 lval* builtin_div(lenv* e, lval* a) { return builtin_op(e, a, "/"); }
 
+lval* builtin_print(lenv* e, lval* a) {
+	for(int i = 0; i < a->count; i++) {
+		lval_print(a->cell[i]);
+		putchar(' ');
+	}
+
+	putchar('\n');
+	lval_del(a);
+
+	return lval_sexpr();
+}
+
+lval* builtin_error(lenv* e, lval* a) {
+	LASSERT_NUM("error", a, 1);
+	LASSERT_TYPE("error", a, 0, LVAL_STR);
+
+	lval* err = lval_err(a->cell[0]->str);
+
+	lval_del(a);
+	return err;
+}
+
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
 	lval* k = lval_sym(name);
 	lval* v = lval_fun(func);
@@ -733,6 +759,8 @@ void lenv_add_builtins(lenv* e){
 	lenv_add_builtin(e, "cons", builtin_cons);
 	lenv_add_builtin(e, "init", builtin_init);
 	lenv_add_builtin(e, "eval", builtin_eval);
+	lenv_add_builtin(e, "print", builtin_print);
+	lenv_add_builtin(e, "error", builtin_error);
 }
 
 lval* lval_eval_sexpr(lenv* e, lval* v) {

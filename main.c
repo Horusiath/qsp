@@ -23,14 +23,37 @@ void add_history(char* unused) {}
 
 #endif
 
+mpc_parser_t* Number;
+mpc_parser_t* String;
+mpc_parser_t* Symbol;
+mpc_parser_t* Comment;
+mpc_parser_t* Qexpr;
+mpc_parser_t* Sexpr;
+mpc_parser_t* Expr;
+mpc_parser_t* Qsp;
+
 lval* lval_read_num(mpc_ast_t* t) {
   long x = strtol(t->contents, NULL, 10);
   return errno != ERANGE ? lval_num(x) : lval_err("invalid number");
 }
 
+lval* lval_read_str(mpc_ast_t* t) {
+	t->contents[strlen(t->contents) - 1] = '\0'; // cut off final '"' character
+	char* unesc = (char*)malloc(strlen(t->contents)+1);
+	strcpy(unesc, t->contents+1);
+
+	unesc = mpcf_unescape(unesc);
+
+	lval* str = lval_str(unesc);
+
+	free(unesc);
+	return str;
+}
+
 lval* lval_read(mpc_ast_t* t){
   if (strstr(t->tag, "number")) { return lval_read_num(t); }
   if (strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
+  if (strstr(t->tag, "string")) { return lval_read_str(t); }
 
   lval* x = NULL;
   if (strcmp(t->tag, ">") == 0) { x = lval_sexpr(); }
@@ -44,6 +67,7 @@ lval* lval_read(mpc_ast_t* t){
     if (strcmp(t->children[i]->contents, "}") == 0) { continue; }
     if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
     if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
+    if (strcmp(t->children[i]->tag,  "comment") == 0) { continue; }
 
     x = lval_add(x, lval_read(t->children[i]));
   }
@@ -51,31 +75,83 @@ lval* lval_read(mpc_ast_t* t){
   return x;
 }
 
+lval* builtin_load(lenv* e, lval* a) {
+	LASSERT_NUM("load", a, 1);
+	LASSERT_TYPE("load", a, 0, LVAL_STR);
+
+	// parse file given by string name
+	mpc_result_t r;
+	if(mpc_parse_contents(a->cell[0]->str, Qsp, &r)) {
+		// read contents
+		lval* expr = lval_read(r.output);
+		mpc_ast_delete(r.output);
+
+		while(expr->count) {
+			lval* x = lval_eval(e, lval_pop(expr, 0));
+			if(x->type == LVAL_ERR) { lval_print(x); }
+			lval_del(x);
+		}
+		// delete expressions and arguments
+		lval_del(expr);
+		lval_del(a);
+		return lval_sexpr();
+	} else {
+		// get parse error
+		char* err_msg = mpc_err_string(r.error);
+		mpc_err_delete(r.error);
+
+		lval* err = lval_err("Could not load library %s", err_msg);
+		free(err_msg);
+		lval_del(a);
+
+		return err;
+	}
+}
+
 int main(int argc, char** argv) {
-  
-  mpc_parser_t* Number = mpc_new("number");
-  mpc_parser_t* Symbol = mpc_new("symbol");
-  mpc_parser_t* Qexpr = mpc_new("qexpr");
-  mpc_parser_t* Sexpr = mpc_new("sexpr");
-  mpc_parser_t* Expr = mpc_new("expr");
-  mpc_parser_t* Qsp = mpc_new("qsp");
+  Number 	= mpc_new("number");
+  String 	= mpc_new("string");
+  Symbol 	= mpc_new("symbol");
+  Comment 	= mpc_new("comment");
+  Qexpr 	= mpc_new("qexpr");
+  Sexpr 	= mpc_new("sexpr");
+  Expr 		= mpc_new("expr");
+  Qsp 		= mpc_new("qsp");
 
   mpca_lang(MPC_LANG_DEFAULT,
-		  "                                                     \
-		    number : /-?[0-9]+/ ;                               \
-		    symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/ ;         \
-		    sexpr  : '(' <expr>* ')' ;                          \
-		    qexpr  : '{' <expr>* '}' ;                          \
-		    expr   : <number> | <symbol> | <sexpr> | <qexpr> ;  \
-		    qsp  : /^/ <expr>* /$/ ;                          \
+		  "                                              \
+		    number  : /-?[0-9]+/ ;                       \
+		    symbol  : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ; \
+		    string  : /\"(\\\\.|[^\"])*\"/ ;             \
+		    comment : /;[^\\r\\n]*/ ;                    \
+		    sexpr   : '(' <expr>* ')' ;                  \
+		    qexpr   : '{' <expr>* '}' ;                  \
+		    expr    : <number>  | <symbol> | <string>    \
+		            | <comment> | <sexpr>  | <qexpr>;    \
+		    qsp  : /^/ <expr>* /$/ ;                     \
 		  ",
-    Number, Symbol, Sexpr, Qexpr, Expr, Qsp);
+    Number, String, Comment, Symbol, Sexpr, Qexpr, Expr, Qsp);
 
   puts("Qsp Version 0.0.0.1");
   puts("Press Ctrl+c to Exit\n");
   
   lenv* e = lenv_new();
   lenv_add_builtins(e);
+  lenv_add_builtin(e, "load", builtin_load);
+
+  if(argc >= 2) {
+	  for(int i = 1; i < argc; i++) {
+		  // create argument list with a single argument being filename
+		  lval* args = lval_add(lval_sexpr(), lval_str(argv[i]));
+		  // pass to builtin load and get the result
+		  lval* x = builtin_load(e, args);
+
+		  if(x->type == LVAL_ERR) { lval_println(x); }
+
+		  lval_del(x);
+	  }
+  }
+
   while (1) {
   
     char* input = readline("qsp> ");
@@ -99,7 +175,7 @@ int main(int argc, char** argv) {
   }
   lenv_del(e);
   
-  mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, Qsp);
+  mpc_cleanup(8, Number, String, Comment, Symbol, Sexpr, Qexpr, Expr, Qsp);
   
   return 0;
 }
