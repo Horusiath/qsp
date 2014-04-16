@@ -81,12 +81,12 @@ lval* builtin_load(lenv* e, lval* a) {
 
 	// parse file given by string name
 	mpc_result_t r;
-	if(mpc_parse_contents(a->cell[0]->str, Qsp, &r)) {
+	if(mpc_parse_contents(a->as.list.cell[0]->as.str, Qsp, &r)) {
 		// read contents
 		lval* expr = lval_read(r.output);
 		mpc_ast_delete(r.output);
 
-		while(expr->count) {
+		while(expr->as.list.count) {
 			lval* x = lval_eval(e, lval_pop(expr, 0));
 			if(x->type == LVAL_ERR) { lval_print(x); }
 			lval_del(x);

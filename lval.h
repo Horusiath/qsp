@@ -9,24 +9,28 @@
 	}
 
 #define LASSERT_TYPE(func, args, index, expect)											\
-	LASSERT(args, (args->cell[index]->type == expect), 									\
+	LASSERT(args, (args->as.list.cell[index]->type == expect), 									\
 		"Function '%s' passed incorrect type for argument %i. Got %s, expected %s.",	\
-		func, index, ltype_name(args->cell[index]->type), ltype_name(expect))
+		func, index, ltype_name(args->as.list.cell[index]->type), ltype_name(expect))
 
 #define LASSERT_NUM(func, args, num)													\
-	LASSERT(args, (args->count == num),													\
+	LASSERT(args, (args->as.list.count == num),													\
 		"Function '%s' passed incorrect number of arguments. Got %i, expected %i.",		\
-		func, args->count, num)
+		func, args->as.list.count, num)
 
 #define LASSERT_NOT_EMPTY(func, args, index) 			\
-	LASSERT(args, (args->cell[index]->count != 0),		\
+	LASSERT(args, (args->as.list.cell[index]->as.list.count != 0),		\
 		"Function '%s' passed {} for argument %i.",		\
 		func, index)
 
 struct lval;
 struct lenv;
+struct lfun;
+struct llist;
 typedef struct lval lval;
 typedef struct lenv lenv;
+typedef struct lfun lfun;
+typedef struct llist llist;
 
 typedef lval* (*lbuiltin)(lenv*, lval*);
 
@@ -48,31 +52,31 @@ enum {
 	LVAL_SEXPR 
 };
 
-/* Declare New lval Struct */
+/* lambda function struct */
+struct lfun {
+	lbuiltin builtin;
+	lenv* env;
+	lval* formals;
+	lval* body;
+};
+
+struct llist {
+	int 	count;
+	lval** 	cell;
+};
+
+
 struct lval {
   int type;
 
-  /* basic data */
-  char* err;
-  char* sym;
-
-  /* strings */
-  char* str;
-
-  /* builtin functions */
-  lbuiltin builtin;
-
-  /* lambda functions */
-  lenv* env;
-  lval* formals;
-  lval* body;
-
-  /* values */
-  long num;
-
-  /* expression */
-  int count;
-  struct lval** cell;
+  union {
+	  char* err;
+	  char* sym;
+	  char* str;
+	  long num;
+	  lfun fun;
+	  llist list;
+  } as;
 };
 
 struct lenv {
