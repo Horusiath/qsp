@@ -7,21 +7,9 @@
 (fun {pack f & xs} {f xs})
 (def {curry} {unpack})
 (def {uncurry} {pack})
-(fun {rev l} {
-	if (== l {}) 
-		{{}} 
-		{join (rev (tail l)) (head l)}
-})
-(fun {nth n l} {
-	if (== n 0) 
-		{head l} 
-		{nth (- n 1) (tail l)}
-})
-(fun {last l} {
-	if (== 1 (len l)) 
-		{head l} 
-		{last (tail l)}
-})
+(fun {rev l} {if (== l nil) {nil} {join (rev (tail l)) (head l)}})
+(fun {nth n l} {if (== n 0) {head l} {nth (- n 1) (tail l)}})
+(fun {last l} {if (== 1 (len l)) {head l} {last (tail l)}})
 (fun {flip f x y} {f y x})
 (fun {ghost & xs} {eval xs})
 (fun {comp f g x} {f (g x)})
@@ -32,60 +20,15 @@
 (fun {or x y} {+ x y})
 (fun {and x y} {* x y})
 (fun {let b} {((\ {_} b) ())})
-(fun {take n l} {
-	if (== n 0) 
-		{nil} 
-		{join (head l) (take (- n 1) (tail l))}
-})
-(fun {drop n l} {
-	if (== n 0) 
-		{l} 
-		{drop (- n 1) (tail l)}
-})
+(fun {take n l} {if (== n 0) {nil} {join (head l) (take (- n 1) (tail l))}})
+(fun {drop n l} {if (== n 0) {l} {drop (- n 1) (tail l)}})
 (fun {split n l} {list (take n l) (drop n l)})
-(fun {elem x l} {
-	if (== l nil) 
-		{false} 
-		{if (== x (fst l)) 
-			{true} 
-			{elem x (tail l)}
-		}
-})
-(fun {map f l} {
-	if (== l nil) 
-		{nil} 
-		{join (list (f (fst l))) (map f (tail l))}
-})
-(fun {filter f l} {
-	if (== l nil) 
-		{nil} 
-		{join (if (f (fst l))  
-			{head l} 
-			{nil}) 
-			(filter f (tail l))
-		}
-})
-(fun {foldl f z l} {
-	if (== l nil) 
-		{z} 
-		{foldl f (f z (fst l)) (tail l)}
-})
+(fun {elem x l} {if (== l nil) {false} {if (== x (fst l)) {true} {elem x (tail l)}}})
+(fun {map f l} {if (== l nil) {nil} {join (list (f (fst l))) (map f (tail l))}})
+(fun {filter f l} {if (== l nil) {nil} {join (if (f (fst l)) {head l} {nil}) (filter f (tail l))}})
+(fun {foldl f z l} {if (== l nil) {z} {foldl f (f z (fst l)) (tail l)}})
 (fun {sum l} {foldl + 0 l})
 (fun {product l} {foldl + 1 l})
 (def {otherwise} {true})
-(fun {select & cs} {
-	if (== cs nil) 
-		{error "No Selection Found"}
-		{if (fst (fst cs)) 
-			{snd (fst cs)}
-			{unpack select (tail cs)}
-		}
-})
-(fun {case x & cs} {
-	if (== cs nil)
-		{error "No Case Found"}
-		{if (== x (fst (fst cs)))
-			{snd (fst cs)}
-			{unpack case (join (list x) (tail cs))}
-		}
-})
+(fun {select & cs} {if (== cs nil) {error "No Selection Found"} {if (fst (fst cs)) snd (fst cs)} {unpack select (tail cs)}})
+(fun {case x & cs} {if (== cs nil) {error "No Case Found"} {if (== x (fst (fst cs))) {snd (fst cs)} {unpack case (join (list x) (tail cs))}}})

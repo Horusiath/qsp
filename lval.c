@@ -6,6 +6,7 @@
 lval* lval_num(long x) {
   lval* v = (lval*)malloc(sizeof(lval));
   v->type = LVAL_NUM;
+  v->hash = hmap_int_h(x);
   v->as.num = x;
   return v;
 }
@@ -13,6 +14,7 @@ lval* lval_num(long x) {
 lval* lval_str(char* s) {
 	  lval* v = (lval*)malloc(sizeof(lval));
 	  v->type = LVAL_STR;
+	  v->hash = hmap_str_h(s);
 	  v->as.str = (char*)malloc(strlen(s) + 1);
 	  strcpy(v->as.str, s);
 	  return v;
@@ -21,6 +23,7 @@ lval* lval_str(char* s) {
 lval* lval_fun(lbuiltin func) {
 	  lval* v = (lval*)malloc(sizeof(lval));
 	  v->type = LVAL_FUN;
+	  v->hash = hmap_int_h((int*)func);
 	  v->as.fun.builtin = func;
 	  return v;
 }
@@ -33,6 +36,9 @@ lval* lval_lambda(lval* formals, lval* body) {
 	v->as.fun.env = lenv_new();
 	v->as.fun.formals = formals;
 	v->as.fun.body = body;
+
+	int h = formals->hash ^ body->hash;
+	v->hash = h;
 
 	return v;
 }
@@ -51,6 +57,7 @@ lval* lval_err(char* fmt, ...) {
   vsnprintf(v->as.err, 511, fmt, va);
 
   v->as.err = realloc(v->as.err, strlen(v->as.err) + 1);
+  v->hash = hmap_str_h(v->as.err);
   va_end(va);
 
   return v;
@@ -59,14 +66,15 @@ lval* lval_err(char* fmt, ...) {
 lenv* lenv_copy(lenv* env) {
 	lenv* n = (lenv*)malloc(sizeof(lenv));
 	n->par = env->par;
-	n->count = env->count;
-	n->syms = (char**)malloc(sizeof(char*) * n->count);
-	n->vals = (lval**)malloc(sizeof(lval*) * n->count);
-	for(int i = 0; i < n->count; i++) {
-		n->syms[i] = (char*)malloc(strlen(env->syms[i]) + 1);
-		strcpy(n->syms[i], env->syms[i]);
-		n->vals[i] = lval_copy(env->vals[i]);
+	n->map = hmap_new();
+	for(int i = 0; i < env->map->cap; i++) {
+		hslot s = env->map->slots[i];
+		if(s.used == 1) {
+			lval* cp = lval_copy(s.val);
+			hmap_put(n->map, cp->hash, cp);
+		}
 	}
+
 	return n;
 }
 
@@ -86,6 +94,7 @@ char * ltype_name(int t) {
 lval* lval_sym(char* s){
   lval* v = (lval*)malloc(sizeof(lval));
   v->type = LVAL_SYM;
+  v->hash = hmap_str_h(s);
   v->as.sym = (char*)malloc(strlen(s) + 1);
   strcpy(v->as.sym, s);
   return v;
@@ -94,6 +103,7 @@ lval* lval_sym(char* s){
 lval* lval_sexpr(void){
   lval* v = (lval*)malloc(sizeof(lval));
   v->type = LVAL_SEXPR;
+  v->hash = hmap_list_h(0, NULL);
   v->as.list.count = 0;
   v->as.list.cell = NULL;
 
@@ -103,6 +113,7 @@ lval* lval_sexpr(void){
 lval* lval_qexpr(void) {
 	lval* v = (lval*)malloc(sizeof(lval));
 	v->type = LVAL_QEXPR;
+	v->hash = hmap_list_h(0, NULL);
 	v->as.list.count = 0;
 	v->as.list.cell = NULL;
 
@@ -113,6 +124,7 @@ lval* lval_add(lval* e, lval* x) {
   e->as.list.count++;
   e->as.list.cell = realloc(e->as.list.cell, sizeof(lval*) * e->as.list.count);
   e->as.list.cell[e->as.list.count-1] = x;
+  e->hash = hmap_list_h(e->as.list.count, e->as.list.cell);
   return e;
 }
 
@@ -209,6 +221,7 @@ lval* lval_take(lval* v, int i) {
 lval* lval_copy(lval* v) {
 	lval* x = (lval*)malloc(sizeof(lval));
 	x->type = v->type;
+	x->hash = v->hash;
 
 	switch(v->type) {
 		case LVAL_NUM: x->as.num = v->as.num; break;
@@ -245,26 +258,38 @@ lval* lval_copy(lval* v) {
 lenv* lenv_new(void) {
 	lenv* e = (lenv*)malloc(sizeof(lenv));
 	e->par = NULL;
-	e->count = 0;
-	e->syms = NULL;
-	e->vals = NULL;
+	e->map = hmap_new();
 	return e;
 }
 
 void lenv_del(lenv* e) {
-	for(int i = 0; i < e->count; i++){
-		free(e->syms[i]);
-		lval_del(e->vals[i]);
+	for(int i = 0; i < e->map->cap; i++) {
+		hslot s = e->map->slots[i];
+		if(s.used) { lval_del(s.val); }
 	}
 
-	free(e->syms);
-	free(e->vals);
+	hmap_del(e->map);
 	free(e);
 }
 
+void lenv_print(lenv* e) {
+	for(int i = 0; i < e->map->cap; i++) {
+		hslot s = e->map->slots[i];
+		if(s.used == 1) {
+			puts("{");
+
+			printf("%ui, ", s.hash);
+			lval_print(s.val);
+
+			puts("}\n");
+		}
+	}
+}
+
 lval* lenv_get(lenv* e, lval* k) {
-	for(int i = 0; i < e->count; i++) {
-		if(strcmp(e->syms[i], k->as.sym) == 0) { return lval_copy(e->vals[i]); }
+	lval* val= hmap_get(e->map, k->hash);
+	if(val) {
+		return lval_copy(val);
 	}
 
 	if(e->par) {
@@ -275,24 +300,7 @@ lval* lenv_get(lenv* e, lval* k) {
 }
 
 void lenv_put(lenv* env, lval* key, lval* val) {
-	// check if symbol already exists (don't insert duplicated values)
-	for(int i = 0; i < env->count; i++) {
-		if(strcmp(env->syms[i], key->as.sym) == 0) {
-			lval_del(env->vals[i]);
-			env->vals[i] = lval_copy(val);
-			return;
-		}
-	}
-
-	// if not entry found, allocate space for new one
-	int c = ++env->count;
-	env->vals = (lval**)realloc(env->vals, sizeof(lval*) * c);
-	env->syms = (char**)realloc(env->syms, sizeof(char*) * c);
-
-	// copy contents
-	env->vals[c-1] = lval_copy(val);
-	env->syms[c-1] = (char*)malloc(strlen(key->as.sym) + 1);
-	strcpy(env->syms[c-1], key->as.sym);
+	hmap_put(env->map, key->hash, lval_copy(val));
 }
 
 void lenv_def(lenv* e, lval* v, lval* k) {
@@ -585,7 +593,7 @@ lval* builtin_join(lenv* e, lval* a) {
 	return x;
 }
 
-lval* builtin_if(lval* e, lval*a) {
+lval* builtin_if(lval* e, lval* a) {
 	LASSERT_NUM("if", a, 3);
 	LASSERT_TYPE("if", a, 0, LVAL_NUM);
 	LASSERT_TYPE("if", a, 1, LVAL_QEXPR);
@@ -798,4 +806,146 @@ lval* lval_eval(lenv* e, lval *v){
 
     if(v->type == LVAL_SEXPR) { return lval_eval_sexpr(e, v); }
     return v;
+}
+
+#define HASH_INIT_SIZE 4
+#define HASH_GROWT_RATE 2
+
+#define HASH_RES(h, key) key % h->cap
+
+hmap* hmap_new(void) {
+	 hmap* h = (hmap*)malloc(sizeof(hmap));
+	 h->slots = (hslot*)malloc(sizeof(hslot) * HASH_INIT_SIZE);
+	 memset(h->slots, 0, sizeof(hslot) * HASH_INIT_SIZE);
+	 h->cap = HASH_INIT_SIZE;
+	 h->len = 0;
+
+	 return h;
+}
+
+void hmap_del(hmap* h) {
+	free(h->slots);
+	free(h);
+}
+
+// hashing function for an int
+unsigned int hmap_int_h(int key) {
+	key += (key << 12);
+	key ^= (key >> 22);
+	key += (key << 4);
+	key ^= (key >> 9);
+	key += (key << 10);
+	key ^= (key >> 2);
+	key += (key << 7);
+	key ^= (key >> 12);
+
+	/* Knuth's Multiplicative Method */
+	key = (key >> 3) * 2654435761;
+
+	return key;
+}
+
+// hashing function for a string
+unsigned int hmap_str_h(char* s) {
+	int hash = 0, n = strlen(s);
+	for (int i = 0; i < n; i++) {
+		hash = 31*hash + s[i];
+	}
+	return hash;
+}
+
+unsigned int hmap_list_h(int n, lval* l) {
+	int hash = 31;
+	for (int i = 0; i < n; i++) {
+		hash = 31*hash + l[i].hash;
+	}
+	return hash;
+}
+
+int hmap_h(hmap* h, int hash) {
+	if(h->len == h->cap) { return HASH_FULL; }
+
+	int c = HASH_RES(h, hash);
+	for(int i = 0; i < h->cap; i++) {
+		hslot s = h->slots[c];
+		if(s.used == 0) { return c; }
+		if(s.hash == hash && s.used == 1) { return c; }
+
+		c = (c + 1) % h->cap;
+	}
+
+	return HASH_FULL;
+}
+
+int hmap_put(hmap* h, int hash, lval* val) {
+	int i = hmap_h(h, hash);
+	while(i == HASH_FULL) {
+		if(hmap_rehash(h) == HASH_MEM_OUT) { return HASH_MEM_OUT; }
+		i = hmap_h(h, hash);
+	}
+
+	// set in data
+   	h->slots[i].val = val;
+	h->slots[i].used = 1;
+	h->slots[i].hash = hash;
+
+	h->len++;
+
+	return HASH_OK;
+}
+
+int hmap_rehash(hmap* h) {
+	int old_size = h->cap;
+	int new_size = (int)(old_size * HASH_GROWT_RATE);
+	hslot* tmp = (hslot*)malloc(sizeof(hslot) * new_size);
+	if(!tmp) { return HASH_MEM_OUT; }
+
+	memset(tmp, 0, new_size);
+	hslot* curr = h->slots;
+	h->slots = tmp;
+	h->cap = new_size;
+	h->len = 0;
+
+	for(int i = 0; i < old_size; i++) {
+		int status = hmap_put(h, curr[i].hash, curr[i].val);
+		if(status != HASH_OK) return status;
+	}
+
+	free(curr);
+	return HASH_OK;
+}
+
+lval* hmap_get(hmap* h, int hash) {
+	int c = HASH_RES(h, hash);
+
+	// linear probing
+	for(int i = 0; i < h->cap; i++) {
+		hslot s = h->slots[c];
+		if(s.hash == hash && s.used == 1) {
+			return s.val;
+		}
+		c = (c + 1) % h->cap;
+	}
+
+	return NULL;
+}
+
+int hmap_rem(hmap* h, int hash) {
+	int c = HASH_RES(h, hash);
+
+	// linear probing
+	for(int i = 0; i < h->cap; i++) {
+		hslot s = h->slots[c];
+		if(s.hash == hash && s.used == 1) {
+			s.used = 0;
+			s.hash = 0;
+			s.val = NULL;
+
+			h->len--;
+			return HASH_OK;
+		}
+		c = (c + 1) % h->cap;
+	}
+
+	return HASH_MISSING;
 }

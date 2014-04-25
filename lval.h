@@ -9,12 +9,12 @@
 	}
 
 #define LASSERT_TYPE(func, args, index, expect)											\
-	LASSERT(args, (args->as.list.cell[index]->type == expect), 									\
+	LASSERT(args, (args->as.list.cell[index]->type == expect), 							\
 		"Function '%s' passed incorrect type for argument %i. Got %s, expected %s.",	\
 		func, index, ltype_name(args->as.list.cell[index]->type), ltype_name(expect))
 
 #define LASSERT_NUM(func, args, num)													\
-	LASSERT(args, (args->as.list.count == num),													\
+	LASSERT(args, (args->as.list.count == num),											\
 		"Function '%s' passed incorrect number of arguments. Got %i, expected %i.",		\
 		func, args->as.list.count, num)
 
@@ -34,6 +34,18 @@ typedef struct llist llist;
 
 typedef lval* (*lbuiltin)(lenv*, lval*);
 
+typedef struct {
+	int hash;
+	int used;
+	lval* val;
+} hslot;
+
+typedef struct {
+	int cap;
+	int len;
+	hslot* slots;
+} hmap;
+
 /* Create Enumeration of Possible Error Types */
 enum { 
 	LERR_DIV_ZERO, 
@@ -52,6 +64,13 @@ enum {
 	LVAL_SEXPR 
 };
 
+enum {
+	HASH_MISSING = -3,
+	HASH_FULL = -2,
+	HASH_MEM_OUT = -1,
+	HASH_OK = 0
+};
+
 /* lambda function struct */
 struct lfun {
 	lbuiltin builtin;
@@ -68,6 +87,7 @@ struct llist {
 
 struct lval {
   int type;
+  int hash;
 
   union {
 	  char* err;
@@ -81,9 +101,7 @@ struct lval {
 
 struct lenv {
   lenv* par;
-  int count;
-  char** syms;
-  lval** vals;
+  hmap* map;
 };
 
 lval* lval_num(long x);
@@ -102,6 +120,7 @@ void lval_del(lval* v);
 void lval_expr_print(lval* v, char open, char close);
 void lval_print(lval* v);
 void lval_println(lval* v);
+void lenv_print(lenv* e);
 
 lval* lval_eval(lenv* env, lval* v);
 lval* lval_eval_sexpr(lenv* env, lval* v);
@@ -113,5 +132,15 @@ void lenv_put(lenv* e, lval* v, lval* k);
 void lenv_def(lenv* e, lval* v, lval* k);
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func);
 void lenv_add_builtins(lenv* e);
+
+hmap* hmap_new(void);
+void hmap_del(hmap* h);
+int hmap_put(hmap* h, int key, lval* val);
+lval* hmap_get(hmap* h, int key);
+int hmap_rem(hmap* h, int key);
+
+unsigned int hmap_int_h(int key);
+unsigned int hmap_str_h(char* s);
+unsigned int hmap_list_h(int n, lval* s);
 
 #endif

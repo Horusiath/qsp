@@ -1,6 +1,6 @@
 CC=cc
 OUT=qsp
-CFLAGS=-std=c99 -Wall
+CFLAGS=-std=c99 -Wall -g
 CLIBS=-ledit -lm
 
 all: qsp

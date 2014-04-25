@@ -159,7 +159,6 @@ int main(int argc, char** argv) {
     
     mpc_result_t r;
     if (mpc_parse("<stdin>", input, Qsp, &r)) {
-      
       lval* x = lval_eval(e, lval_read(r.output));
       lval_println(x);
       lval_del(x);
