@@ -3,9 +3,24 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+
+char * ltype_name(int t) {
+	switch(t) {
+	case LVAL_UNDEF: return "Undefined";
+	case LVAL_ERR: return "Error";
+	case LVAL_FUN: return "Function";
+	case LVAL_NUM: return "Number";
+	case LVAL_QEXPR: return "Q-Expression";
+	case LVAL_SEXPR: return "S-Expression";
+	case LVAL_SYM: return "Symbol";
+	case LVAL_STR: return "String";
+	default: return "Unknown";
+	}
+}
+
 /* Create a new number type lval */
 lval* lval_num(long x) {
-  lval* v = (lval*)malloc(sizeof(lval));
+  lval* v = lval_new();
   v->type = LVAL_NUM;
   v->hash = hmap_int_h(x);
   v->as.num = x;
@@ -13,7 +28,7 @@ lval* lval_num(long x) {
 }
 
 lval* lval_str(char* s) {
-	  lval* v = (lval*)malloc(sizeof(lval));
+	  lval* v = lval_new();
 	  v->type = LVAL_STR;
 	  v->hash = hmap_str_h(s);
 	  v->as.str = (char*)malloc(strlen(s) + 1);
@@ -22,7 +37,7 @@ lval* lval_str(char* s) {
 }
 
 lval* lval_fun(lbuiltin func) {
-	  lval* v = (lval*)malloc(sizeof(lval));
+	  lval* v = lval_new();
 	  v->type = LVAL_FUN;
 	  v->hash = hmap_int_h((int*)func);
 	  v->as.fun.builtin = func;
@@ -30,7 +45,7 @@ lval* lval_fun(lbuiltin func) {
 }
 
 lval* lval_lambda(lval* formals, lval* body) {
-	lval* v = (lval*)malloc(sizeof(lval));
+	lval* v = lval_new();
 
 	v->type = LVAL_FUN;
 	v->as.fun.builtin = NULL;
@@ -46,7 +61,7 @@ lval* lval_lambda(lval* formals, lval* body) {
 
 /* Create a new error type lval */
 lval* lval_err(char* fmt, ...) {
-  lval* v = (lval*)malloc(sizeof(lval));
+  lval* v = lval_new();
   v->type = LVAL_ERR;
 
   // create a va_list
@@ -71,7 +86,7 @@ lenv* lenv_copy(lenv* env) {
 	for(int i = 0; i < env->map->cap; i++) {
 		hslot s = env->map->slots[i];
 		if(s.used == 1) {
-			lval* cp = lval_copy(s.val);
+			lval* cp = lval_cp(s.val);
 			hmap_put(n->map, cp->hash, cp);
 		}
 	}
@@ -79,21 +94,8 @@ lenv* lenv_copy(lenv* env) {
 	return n;
 }
 
-char * ltype_name(int t) {
-	switch(t) {
-	case LVAL_ERR: return "Error";
-	case LVAL_FUN: return "Function";
-	case LVAL_NUM: return "Number";
-	case LVAL_QEXPR: return "Q-Expression";
-	case LVAL_SEXPR: return "S-Expression";
-	case LVAL_SYM: return "Symbol";
-	case LVAL_STR: return "String";
-	default: return "Unknown";
-	}
-}
-
 lval* lval_sym(char* s){
-  lval* v = (lval*)malloc(sizeof(lval));
+  lval* v = lval_new();
   v->type = LVAL_SYM;
   v->hash = hmap_str_h(s);
   v->as.sym = (char*)malloc(strlen(s) + 1);
@@ -102,7 +104,7 @@ lval* lval_sym(char* s){
 }
 
 lval* lval_sexpr(void){
-  lval* v = (lval*)malloc(sizeof(lval));
+  lval* v = lval_new();
   v->type = LVAL_SEXPR;
   v->hash = hmap_list_h(0, NULL);
   v->as.list.count = 0;
@@ -112,7 +114,7 @@ lval* lval_sexpr(void){
 }
 
 lval* lval_qexpr(void) {
-	lval* v = (lval*)malloc(sizeof(lval));
+	lval* v = lval_new();
 	v->type = LVAL_QEXPR;
 	v->hash = hmap_list_h(0, NULL);
 	v->as.list.count = 0;
@@ -129,33 +131,8 @@ lval* lval_add(lval* e, lval* x) {
   return e;
 }
 
-void lval_del(lval* v){
-  switch(v->type){
-    case LVAL_NUM: break;
-    case LVAL_STR: free(v->as.str); break;
-    case LVAL_FUN:
-    	if(!v->as.fun.builtin){
-    		lenv_del(v->as.fun.env);
-    		lval_del(v->as.fun.formals);
-    		lval_del(v->as.fun.body);
-    	}
-    break;
-    case LVAL_ERR: free(v->as.err); break;
-    case LVAL_SYM: free(v->as.sym); break;
-    case LVAL_QEXPR:
-    case LVAL_SEXPR: 
-      for(int i=0; i < v->as.list.count; i++){
-        lval_del(v->as.list.cell[i]);
-      }
-      free(v->as.list.cell);
-    break;
-  }
-
-  free(v);
-}
-
 void lval_print_str(lval* v) {
-	char * escaped = malloc(strlen(v->as.str) + 1);
+	char * escaped = (char*)malloc(strlen(v->as.str) + 1);
 	strcpy(escaped, v->as.str);
 	escaped = mpcf_escape(escaped);
 
@@ -219,42 +196,6 @@ lval* lval_take(lval* v, int i) {
     return x;
 }
 
-lval* lval_copy(lval* v) {
-	lval* x = (lval*)malloc(sizeof(lval));
-	x->type = v->type;
-	x->hash = v->hash;
-
-	switch(v->type) {
-		case LVAL_NUM: x->as.num = v->as.num; break;
-		case LVAL_STR:
-			x->as.str = (char*)malloc(strlen(v->as.str)+1);
-			strcpy(x->as.str, v->as.str);
-			break;
-		case LVAL_FUN:
-			if(v->as.fun.builtin){
-				x->as.fun.builtin = v->as.fun.builtin;
-			} else {
-				x->as.fun.builtin = NULL;
-				x->as.fun.env = lenv_copy(v->as.fun.env);
-				x->as.fun.formals = lval_copy(v->as.fun.formals);
-				x->as.fun.body = lval_copy(v->as.fun.body);
-			}
-			break;
-		case LVAL_ERR: x->as.err = (char*)malloc(strlen(v->as.err)+1); strcpy(x->as.err, v->as.err); break;
-		case LVAL_SYM: x->as.sym = (char*)malloc(strlen(v->as.sym)+1); strcpy(x->as.sym, v->as.sym); break;
-
-		case LVAL_SEXPR:
-		case LVAL_QEXPR:
-			x->as.list.count = v->as.list.count;
-			x->as.list.cell = (lval**)malloc(sizeof(lval*) * x->as.list.count);
-			for(int i = 0; i < x->as.list.count; i++) {
-				x->as.list.cell[i] = lval_copy(v->as.list.cell[i]);
-			}
-			break;
-	}
-
-	return x;
-}
 
 lenv* lenv_new(void) {
 	lenv* e = (lenv*)malloc(sizeof(lenv));
@@ -290,7 +231,7 @@ void lenv_print(lenv* e) {
 lval* lenv_get(lenv* e, lval* k) {
 	lval* val= hmap_get(e->map, k->hash);
 	if(val) {
-		return lval_copy(val);
+		return lval_cp(val);
 	}
 
 	if(e->par) {
@@ -301,7 +242,7 @@ lval* lenv_get(lenv* e, lval* k) {
 }
 
 void lenv_put(lenv* env, lval* key, lval* val) {
-	hmap_put(env->map, key->hash, lval_copy(val));
+	hmap_put(env->map, key->hash, lval_cp(val));
 }
 
 void lenv_def(lenv* e, lval* v, lval* k) {
@@ -370,10 +311,10 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
 	if(f->as.fun.formals->as.list.count == 0) {
 		// execute lambda function and return result
 		f->as.fun.env->par = e;
-		return builtin_eval(f->as.fun.env, lval_add(lval_sexpr(), lval_copy(f->as.fun.body)));
+		return builtin_eval(f->as.fun.env, lval_add(lval_sexpr(), lval_cp(f->as.fun.body)));
 	} else {
 		// return partially evaluated lambda function
-		return lval_copy(f);
+		return lval_cp(f);
 	}
 }
 

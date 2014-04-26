@@ -32,6 +32,8 @@ mpc_parser_t* Sexpr;
 mpc_parser_t* Expr;
 mpc_parser_t* Qsp;
 
+mem_heap* HEAP;
+
 lval* lval_read_num(mpc_ast_t* t) {
   long x = strtol(t->contents, NULL, 10);
   return errno != ERANGE ? lval_num(x) : lval_err("invalid number");
@@ -132,9 +134,10 @@ int main(int argc, char** argv) {
 		  ",
     Number, String, Comment, Symbol, Sexpr, Qexpr, Expr, Qsp);
 
-  puts("Qsp Version 0.0.0.1");
+  puts("Qsp Version 0.0.3.0");
   puts("Press Ctrl+c to Exit\n");
   
+  HEAP = heap_new();
   lenv* e = lenv_new();
   lenv_add_builtins(e);
   lenv_add_builtin(e, "load", builtin_load);
@@ -173,6 +176,7 @@ int main(int argc, char** argv) {
     free(input);
   }
   lenv_del(e);
+  heap_del(HEAP);
   
   mpc_cleanup(8, Number, String, Comment, Symbol, Sexpr, Qexpr, Expr, Qsp);
   

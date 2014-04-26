@@ -236,24 +236,28 @@ lval* builtin_len(lenv* e, lval* a) {
 }
 
 lval* builtin_var(lenv* e, lval* a, char* op) {
-	LASSERT_TYPE("def", a, 0, LVAL_QEXPR);
+	LASSERT_TYPE(op, a, 0, LVAL_QEXPR);
 
 	lval* syms = a->as.list.cell[0];
-
+/*
+	for(int i = 0; i < a->as.list.count; i++) {
+		lval_println(a->as.list.cell[i]);
+	}
+*/
 	for(int i = 0; i < syms->as.list.count; i++) {
 		LASSERT(a, (syms->as.list.cell[i]->type == LVAL_SYM),
-			"Function 'def' cannot define non-symbol! Get %s, expected %s.",
-			ltype_name(syms->as.list.cell[i]->type), ltype_name(LVAL_SYM));
+			"Function '%s' cannot define non-symbol! Get %s, expected %s.",
+			op, ltype_name(syms->as.list.cell[i]->type), ltype_name(LVAL_SYM));
 	}
 
 	LASSERT(a, (syms->as.list.count == a->as.list.count-1),
-			"Function 'def' passed too many arguments for symbols. Got %i, expected %i.",
-			syms->as.list.count, a->as.list.count-1);
+			"Function '%s' passed too many arguments for symbols. Got %i, expected %i.",
+			op, syms->as.list.count, a->as.list.count-1);
 
 	// assign copies of values to symbols
 	for(int i = 0; i < syms->as.list.count; i++){
 		if (strcmp(op, "def") == 0) { lenv_def(e, syms->as.list.cell[i], a->as.list.cell[i+1]); }
-		if (strcmp(op, "=") == 0) { lenv_put(e, syms->as.list.cell[i], a->as.list.cell[i+1]); }
+		else if (strcmp(op, "=") == 0) { lenv_put(e, syms->as.list.cell[i], a->as.list.cell[i+1]); }
 	}
 
 	lval_del(a);

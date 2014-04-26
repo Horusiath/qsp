@@ -25,10 +25,12 @@
 		"Function '%s' passed {} for argument %i.",		\
 		func, index)
 
+struct mem_heap;
 struct lval;
 struct lenv;
 struct lfun;
 struct llist;
+typedef struct mem_heap mem_heap;
 typedef struct lval lval;
 typedef struct lenv lenv;
 typedef struct lfun lfun;
@@ -45,6 +47,7 @@ enum {
 
 /* Create Enumeration of Possible lval Types */
 enum { 
+	LVAL_UNDEF = 0,
 	LVAL_NUM, 
 	LVAL_STR,
 	LVAL_FUN,
@@ -54,12 +57,29 @@ enum {
 	LVAL_SEXPR 
 };
 
+#define HEAP_INIT_SIZE 		1000
+#define HEAP_GROWTH_RATE 	2
+#define HEAP_MAX_SIZE		100000
+
+enum {
+	HEAP_MEM_OUT = -1
+};
+
+/* managed memory heap */
+struct mem_heap {
+	int		size;
+	lval* 	head;
+	lval* 	next_free_val;
+};
+
+extern mem_heap* HEAP;
+
 /* lambda function struct */
 struct lfun {
-	lbuiltin builtin;
-	lenv* env;
-	lval* formals;
-	lval* body;
+	lbuiltin 	builtin;
+	lenv* 		env;
+	lval* 		formals;
+	lval* 		body;
 };
 
 struct llist {
@@ -70,13 +90,15 @@ struct llist {
 struct lval {
   int type;
   int hash;
+  int ref_count;
+  lval* next;
 
   union {
 	  char* err;
 	  char* sym;
 	  char* str;
-	  long num;
-	  lfun fun;
+	  long 	num;
+	  lfun 	fun;
 	  llist list;
   } as;
 };
@@ -97,8 +119,25 @@ lval* lval_sym(char* s);
 lval* lval_sexpr(void);
 lval* lval_qexpr(void);
 
+/* Creates a new managed heap. */
+mem_heap* heap_new(void);
+
+/* Deletes a managed heap with all of lvalues inside. */
+void heap_del(mem_heap* heap);
+
+/* Allocates a new lvalue from managed heap of undefined type */
+lval* lval_new(void);
+
+/* Adds a [x] to list [sexpr] */
 lval* lval_add(lval* sexpr, lval* x);
-lval* lval_copy(lval* c);
+
+/* Creates a shallow copy of lvalue. */
+lval* lval_cp(lval* c);
+
+/* Creates a deep copy of lvalue. Unlike lval_cp this one allocates a completely new lvalue and copies all of it's inner states. */
+lval* lval_dcp(lval* c);
+
+/* Deletes a lvalue. This functions frees a lvalue back to heap only if reference counter hits zero. */
 void lval_del(lval* v);
 lval* lval_call(lenv* e, lval* f, lval* a);
 
