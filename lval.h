@@ -1,6 +1,8 @@
 #ifndef LVAL_H
 #define LVAL_H
 
+#include "hmap.h"
+
 #define LASSERT(args, cond, fmt, ...) 				\
 	if(!(cond)) { 									\
 		lval* err = lval_err(fmt, ##__VA_ARGS__);	\
@@ -34,18 +36,6 @@ typedef struct llist llist;
 
 typedef lval* (*lbuiltin)(lenv*, lval*);
 
-typedef struct {
-	int hash;
-	int used;
-	lval* val;
-} hslot;
-
-typedef struct {
-	int cap;
-	int len;
-	hslot* slots;
-} hmap;
-
 /* Create Enumeration of Possible Error Types */
 enum { 
 	LERR_DIV_ZERO, 
@@ -64,13 +54,6 @@ enum {
 	LVAL_SEXPR 
 };
 
-enum {
-	HASH_MISSING = -3,
-	HASH_FULL = -2,
-	HASH_MEM_OUT = -1,
-	HASH_OK = 0
-};
-
 /* lambda function struct */
 struct lfun {
 	lbuiltin builtin;
@@ -83,7 +66,6 @@ struct llist {
 	int 	count;
 	lval** 	cell;
 };
-
 
 struct lval {
   int type;
@@ -104,6 +86,8 @@ struct lenv {
   hmap* map;
 };
 
+char * ltype_name(int t);
+
 lval* lval_num(long x);
 lval* lval_str(char* s);
 lval* lval_fun(lbuiltin func);
@@ -116,6 +100,7 @@ lval* lval_qexpr(void);
 lval* lval_add(lval* sexpr, lval* x);
 lval* lval_copy(lval* c);
 void lval_del(lval* v);
+lval* lval_call(lenv* e, lval* f, lval* a);
 
 void lval_expr_print(lval* v, char open, char close);
 void lval_print(lval* v);
@@ -133,14 +118,6 @@ void lenv_def(lenv* e, lval* v, lval* k);
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func);
 void lenv_add_builtins(lenv* e);
 
-hmap* hmap_new(void);
-void hmap_del(hmap* h);
-int hmap_put(hmap* h, int key, lval* val);
-lval* hmap_get(hmap* h, int key);
-int hmap_rem(hmap* h, int key);
-
-unsigned int hmap_int_h(int key);
-unsigned int hmap_str_h(char* s);
 unsigned int hmap_list_h(int n, lval* s);
 
 #endif
