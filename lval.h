@@ -122,6 +122,9 @@ lval* lval_qexpr(void);
 /* Creates a new managed heap. */
 mem_heap* heap_new(void);
 
+/* Prints current heap content. */
+void heap_print(mem_heap* heap);
+
 /* Deletes a managed heap with all of lvalues inside. */
 void heap_del(mem_heap* heap);
 

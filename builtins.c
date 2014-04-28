@@ -11,6 +11,7 @@ lval* builtin_lambda(lenv* e, lval* a) {
 
 	// check if first q-expr has only symbols
 	lval* formals = a->as.list.cell[0];
+
 	for(int i = 0; i < formals->as.list.count; i++) {
 		LASSERT(a, (formals->as.list.cell[i]->type == LVAL_SYM),
 			"Cannot define non-symbol. Got %s, expected %s.",
@@ -31,12 +32,12 @@ lval* builtin_head(lenv* e, lval* a) {
 	LASSERT_NOT_EMPTY("head", a, 0);
 
 	lval* h = lval_take(a, 0);
+	lval* head = lval_cp(h->as.list.cell[0]);
 
-	// delete all non-head elements
-	while(h->as.list.count > 1) {
-		lval_del(lval_pop(h, 1));
-	}
-	return h;
+	// create new Q-Expression with head of previous one as only element
+	lval* q = lval_qexpr();
+	lval_add(q, head);
+	return q;
 }
 
 lval* builtin_tail(lenv* e, lval* a) {
@@ -50,10 +51,13 @@ lval* builtin_tail(lenv* e, lval* a) {
 	//take first
 	h = lval_take(a, 0);
 
-	// delete first element and return
-	lval_del(lval_pop(h, 0));
+	// copy all elements except first to new Q-Expression
+	lval* q = lval_qexpr();
+	for(int i=1; i < h->as.list.count; i++) {
+		lval_add(q, lval_cp(h->as.list.cell[i]));
+	}
 
-	return h;
+	return q;
 }
 
 lval* builtin_init(lenv* e, lval* a) {
@@ -239,11 +243,7 @@ lval* builtin_var(lenv* e, lval* a, char* op) {
 	LASSERT_TYPE(op, a, 0, LVAL_QEXPR);
 
 	lval* syms = a->as.list.cell[0];
-/*
-	for(int i = 0; i < a->as.list.count; i++) {
-		lval_println(a->as.list.cell[i]);
-	}
-*/
+
 	for(int i = 0; i < syms->as.list.count; i++) {
 		LASSERT(a, (syms->as.list.cell[i]->type == LVAL_SYM),
 			"Function '%s' cannot define non-symbol! Get %s, expected %s.",

@@ -25,6 +25,28 @@ heap_new(void) {
 }
 
 void
+heap_print(mem_heap* heap) {
+	lval* n = heap->head;
+	printf("HEAP\nsize:\t%d\ncontent:\n", heap->size);
+	while(n){
+		char c;
+		switch(n->type) {
+		case LVAL_UNDEF: c = '.'; break;
+		case LVAL_ERR: c = 'E'; break;
+		case LVAL_FUN: c = 'F'; break;
+		case LVAL_NUM: c = 'N'; break;
+		case LVAL_QEXPR: c = 'Q'; break;
+		case LVAL_SEXPR: c = 'S'; break;
+		case LVAL_STR: c = 'T'; break;
+		case LVAL_SYM: c = 'A'; break;
+		}
+		putchar(c);
+		n = n->next;
+	}
+	putchar('\n');
+}
+
+void
 heap_del(mem_heap* heap) {
 	lval* n = heap->head;
 

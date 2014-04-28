@@ -59,19 +59,22 @@ lval* lval_read(mpc_ast_t* t){
 
   lval* x = NULL;
   if (strcmp(t->tag, ">") == 0) { x = lval_sexpr(); }
-  if (strstr(t->tag, "sexpr")) { x = lval_sexpr(); }
-  if (strstr(t->tag, "qexpr")) { x = lval_qexpr(); }
+  else if (strstr(t->tag, "sexpr")) { x = lval_sexpr(); }
+  else if (strstr(t->tag, "qexpr")) { x = lval_qexpr(); }
 
   for (int i = 0; i < t->children_num; ++i)
   {
-    if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
-    if (strcmp(t->children[i]->contents, ")") == 0) { continue; }
-    if (strcmp(t->children[i]->contents, "}") == 0) { continue; }
-    if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
-    if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
-    if (strcmp(t->children[i]->tag,  "comment") == 0) { continue; }
+	mpc_ast_t* child = t->children[i];
 
-    x = lval_add(x, lval_read(t->children[i]));
+    if (strcmp(child->contents, "(") == 0) { continue; }
+    if (strcmp(child->contents, ")") == 0) { continue; }
+    if (strcmp(child->contents, "}") == 0) { continue; }
+    if (strcmp(child->contents, "{") == 0) { continue; }
+    if (strcmp(child->tag,  "regex") == 0) { continue; }
+    if (strcmp(child->tag,  "comment") == 0) { continue; }
+
+    lval* parsed = lval_read(child);
+    x = lval_add(x, parsed);
   }
 
   return x;
@@ -156,7 +159,7 @@ int main(int argc, char** argv) {
   }
 
   while (1) {
-  
+	//heap_print(HEAP);
     char* input = readline("qsp> ");
     add_history(input);
     

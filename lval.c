@@ -356,8 +356,17 @@ int lval_eq(lval* x, lval* y) {
 }
 
 lval* lval_eval_sexpr(lenv* e, lval* v) {
-    for(int i = 0; i < v->as.list.count; i++) { v->as.list.cell[i] = lval_eval(e, v->as.list.cell[i]); }
-    for(int i = 0; i < v->as.list.count; i++) { lval* o = v->as.list.cell[i]; if(o->type == LVAL_ERR) { return lval_take(v, i); } }
+    for(int i = 0; i < v->as.list.count; i++) {
+    	lval* evaluable = v->as.list.cell[i];
+    	evaluable = lval_eval(e, evaluable);
+    	v->as.list.cell[i] = evaluable;
+    }
+    for(int i = 0; i < v->as.list.count; i++) {
+    	lval* o = v->as.list.cell[i];
+    	if(o->type == LVAL_ERR) {
+    		return lval_take(v, i);
+    	}
+    }
 
     // empty expression
     if (v->as.list.count == 0) { return v; }
