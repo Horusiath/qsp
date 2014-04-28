@@ -254,30 +254,31 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
 	// if builtin, use straight call
 	if(f->as.fun.builtin) { return f->as.fun.builtin(e, a); }
 
+	lval* cf = lval_dcp(f);
 	int given = a->as.list.count;
-	int total = f->as.fun.formals->as.list.count;
+	int total = cf->as.fun.formals->as.list.count;
 
 	// there are still arguments to be processed
 	while(a->as.list.count) {
 		// too many args provided
-		if(f->as.fun.formals->as.list.count == 0) {
+		if(cf->as.fun.formals->as.list.count == 0) {
 			lval_del(a);
 			return lval_err("Function passed too many arguments. Got %i, expected %i.", given, total);
 		}
 
-		lval* sym = lval_pop(f->as.fun.formals, 0);
+		lval* sym = lval_pop(cf->as.fun.formals, 0);
 
 		// special case - use '&' to deal with variable length arguments
 		if(strcmp(sym->as.sym, "&") == 0) {
 			// & should always be followed by exactly one another symbol
-			if(f->as.fun.formals->as.list.count != 1) {
+			if(cf->as.fun.formals->as.list.count != 1) {
 				lval_del(a);
 				return lval_err("Function format invalid. Symbol '&' not followed by single symbol");
 			}
 
 			// bind next formal to remaining arguments
-			lval* nsym = lval_pop(f->as.fun.formals, 0);
-			lenv_put(f->as.fun.env, nsym, builtin_list(e, a));
+			lval* nsym = lval_pop(cf->as.fun.formals, 0);
+			lenv_put(cf->as.fun.env, nsym, builtin_list(e, a));
 			lval_del(sym);
 			lval_del(nsym);
 			break;
@@ -285,7 +286,7 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
 
 		lval* val = lval_pop(a, 0);
 
-		lenv_put(f->as.fun.env, sym, val);
+		lenv_put(cf->as.fun.env, sym, val);
 
 		lval_del(sym);
 		lval_del(val);
@@ -293,28 +294,28 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
 	lval_del(a);
 
 	// if & remains in formal list it should be bound to empty list
-	if(f->as.fun.formals->as.list.count > 0 && strcmp(f->as.fun.formals->as.list.cell[0]->as.sym, "&") == 0) {
-		if(f->as.fun.formals->as.list.count != 2) {
+	if(cf->as.fun.formals->as.list.count > 0 && strcmp(cf->as.fun.formals->as.list.cell[0]->as.sym, "&") == 0) {
+		if(cf->as.fun.formals->as.list.count != 2) {
 			return lval_err("Function format invalid. Symbol '&' not followed by a single symbol.");
 		}
 
-		lval_del(lval_pop(f->as.fun.formals, 0)); 		// forget '&' symbol
-		lval* sym = lval_pop(f->as.fun.formals, 0);
+		lval_del(lval_pop(cf->as.fun.formals, 0)); 		// forget '&' symbol
+		lval* sym = lval_pop(cf->as.fun.formals, 0);
 		lval* val = lval_qexpr();
 
-		lenv_put(f->as.fun.env, sym, val);
+		lenv_put(cf->as.fun.env, sym, val);
 		lval_del(sym);
 		lval_del(val);
 	}
 
 	// check if all formals from lambda has been evaluated
-	if(f->as.fun.formals->as.list.count == 0) {
+	if(cf->as.fun.formals->as.list.count == 0) {
 		// execute lambda function and return result
-		f->as.fun.env->par = e;
-		return builtin_eval(f->as.fun.env, lval_add(lval_sexpr(), lval_cp(f->as.fun.body)));
+		cf->as.fun.env->par = e;
+		return builtin_eval(cf->as.fun.env, lval_add(lval_sexpr(), lval_cp(cf->as.fun.body)));
 	} else {
 		// return partially evaluated lambda function
-		return lval_cp(f);
+		return lval_cp(cf);
 	}
 }
 
