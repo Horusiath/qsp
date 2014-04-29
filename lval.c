@@ -312,10 +312,10 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
 	if(cf->as.fun.formals->as.list.count == 0) {
 		// execute lambda function and return result
 		cf->as.fun.env->par = e;
-		return builtin_eval(cf->as.fun.env, lval_add(lval_sexpr(), lval_cp(cf->as.fun.body)));
+		return builtin_eval(cf->as.fun.env, lval_add(lval_sexpr(), cf->as.fun.body));
 	} else {
 		// return partially evaluated lambda function
-		return lval_cp(cf);
+		return cf;
 	}
 }
 

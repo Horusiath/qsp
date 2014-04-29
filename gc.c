@@ -154,8 +154,10 @@ lval_delp(lval* v){
   v->ref_count = 0;
   //v->as = 0;
 
-  // set free value as next to get
-  HEAP->next_free_val = v;
+  // if pointer is before last free value on the heap, set free value as next to get
+  if((v) < (HEAP->next_free_val)) {
+	  HEAP->next_free_val = v;
+  }
 }
 
 lval*
