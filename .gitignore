@@ -4,6 +4,9 @@
 *.obj
 *.elf
 
+# paths
+bin/*
+
 # Libraries
 *.lib
 *.a

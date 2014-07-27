@@ -1,5 +1,5 @@
-#include "mpc.h"
-#include "lval.h"
+#include "proto/mpc.h"
+#include "rt/lval.h"
 
 #ifdef _WIN32
 

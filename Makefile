@@ -1,31 +1,33 @@
 CC=cc
-OUT=qsp
+BIN=./bin/
+SRC=./src/
+OUT=$(BIN)qsp
 CFLAGS=-std=c99 -Wall -g
 CLIBS=-ledit -lm
-COMP=main.o lval.o mpc.o hmap.o builtins.o gc.o
+COMP=$(BIN)main.o $(BIN)lval.o $(BIN)mpc.o $(BIN)hmap.o $(BIN)builtins.o $(BIN)gc.o
 
-all: qsp
+all: $(BIN)qsp
 
-qsp: $(COMP)
-	$(CC) $(CFLAGS) $(COMP) $(CLIBS) -o qsp
+$(BIN)qsp: $(COMP)
+	$(CC) $(CFLAGS) $(COMP) $(CLIBS) -o $(BIN)qsp
 
-main.o: main.c lval.o mpc.o
+$(BIN)main.o: $(SRC)main.c $(BIN)lval.o $(BIN)mpc.o
 	$(CC) $(CFLAGS) $(CLIBS) -c -o $@ $<
 
-lval.o: lval.c lval.h hmap.h
-	$(CC) $(CFLAGS) $(CLIBS) -c -o $@ $<
-	
-builtins.o: builtins.c lval.h hmap.h
+$(BIN)lval.o: $(SRC)rt/lval.c $(SRC)rt/lval.h $(SRC)rt/hmap.h
 	$(CC) $(CFLAGS) $(CLIBS) -c -o $@ $<
 	
-gc.o: gc.c lval.h hmap.h
+$(BIN)builtins.o: $(SRC)rt/builtins.c $(SRC)rt/lval.h $(SRC)rt/hmap.h
 	$(CC) $(CFLAGS) $(CLIBS) -c -o $@ $<
 	
-hmap.o: hmap.c hmap.h
+$(BIN)gc.o: $(SRC)rt/gc.c $(SRC)rt/lval.h $(SRC)rt/hmap.h
+	$(CC) $(CFLAGS) $(CLIBS) -c -o $@ $<
+	
+$(BIN)hmap.o: $(SRC)rt/hmap.c $(SRC)rt/hmap.h
 	$(CC) $(CFLAGS) $(CLIBS) -c -o $@ $<
 
-mpc.o: mpc.c mpc.h
+$(BIN)mpc.o: $(SRC)proto/mpc.c $(SRC)proto/mpc.h
 	$(CC) $(CFLAGS) $(CLIBS) -c -o $@ $<
 
 clean:
-	rm -rf *.o $(OUT)
+	rm -rf $(BIN)*.o $(OUT)
